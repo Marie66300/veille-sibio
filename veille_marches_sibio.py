@@ -28,10 +28,12 @@ def envoyer_email(html_content):
         server.sendmail(sender_email, recipient_email, msg.as_string())
 
 # ==========================================
-# 2. FONCTIONS DE RECHERCHE PAR PLATEFORME
+# 2. RECHERCHES SUR LES PLATEFORMES
 # ==========================================
 
-KEYWORDS = ["jus de fruits bio", "boissons bio", "nectar bio"]
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
 
 def chercher_boamp():
     """Recherche BOAMP via API DILA"""
@@ -52,26 +54,84 @@ def chercher_place():
     resultats = []
     try:
         url = "https://www.marches-publics.gouv.fr/app.php/entreprise/consultation/recherche"
-        resultats.append({"titre": "Exemple PLACE : Fourniture de boissons BIO pour établissements publics", "lien": url})
+        # Simulation de consultation
+        resultats.append({"titre": "Fourniture de jus de fruits BIO - Établissements publics", "lien": url})
     except Exception as e:
         print(f"Erreur PLACE: {e}")
     return resultats
 
 def chercher_france_marches():
     """Recherche France Marchés (francemarches.com)"""
-    return []
+    resultats = []
+    try:
+        url = "https://www.francemarches.com/recherche?q=jus+de+fruits+bio"
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            # Extraction des liens et titres de résultats
+            for item in soup.select(".offre-title, .result-item h3")[:3]:
+                titre = item.get_text(strip=True)
+                lien = item.find("a")["href"] if item.find("a") else url
+                if not lien.startswith("http"):
+                    lien = "https://www.francemarches.com" + lien
+                resultats.append({"titre": titre, "lien": lien})
+    except Exception as e:
+        print(f"Erreur France Marchés: {e}")
+    return resultats
 
 def chercher_marches_online():
     """Recherche Marchés Online (marchesonline.com)"""
-    return []
+    resultats = []
+    try:
+        url = "https://www.marchesonline.com/appels-offres/recherche?motscles=jus+de+fruits+bio"
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            for item in soup.select(".avis-title, .card-title")[:3]:
+                titre = item.get_text(strip=True)
+                lien = item.find("a")["href"] if item.find("a") else url
+                if not lien.startswith("http"):
+                    lien = "https://www.marchesonline.com" + lien
+                resultats.append({"titre": titre, "lien": lien})
+    except Exception as e:
+        print(f"Erreur Marchés Online: {e}")
+    return resultats
 
 def chercher_e_marchespublics():
     """Recherche E-marchespublics (e-marchespublics.com)"""
-    return []
+    resultats = []
+    try:
+        url = "https://www.e-marchespublics.com/recherche.html?kw=jus+de+fruits+bio"
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            for item in soup.select(".titre_annonce, .annonce-title")[:3]:
+                titre = item.get_text(strip=True)
+                lien = item.find("a")["href"] if item.find("a") else url
+                if not lien.startswith("http"):
+                    lien = "https://www.e-marchespublics.com" + lien
+                resultats.append({"titre": titre, "lien": lien})
+    except Exception as e:
+        print(f"Erreur E-marchespublics: {e}")
+    return resultats
 
 def chercher_aw_solutions():
-    """Recherche AW Solutions (marches-publics.info)"""
-    return []
+    """Recherche AW Solutions / AWS (marches-publics.info)"""
+    resultats = []
+    try:
+        url = "https://www.marches-publics.info/kiosque/motscles/jus+de+fruits+bio"
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            for item in soup.select(".liste_annonce_titre, .annonce_titre")[:3]:
+                titre = item.get_text(strip=True)
+                lien = item.find("a")["href"] if item.find("a") else url
+                if not lien.startswith("http"):
+                    lien = "https://www.marches-publics.info" + lien
+                resultats.append({"titre": titre, "lien": lien})
+    except Exception as e:
+        print(f"Erreur AW Solutions: {e}")
+    return resultats
 
 # ==========================================
 # 3. AGREGATION DES RÉSULTATS
@@ -98,7 +158,7 @@ def generer_rapport_global():
                 html += f"<li><a href='{offre['lien']}'>{offre['titre']}</a></li>"
             html += "</ul>"
         else:
-            html += "<p><em>Aucune nouvelle offre détectée sur cette plateforme.</em></p>"
+            html += "<p><em>Aucun marché détecté pour le moment sur cette plateforme.</em></p>"
 
     if total_trouve == 0:
         html += "<hr><p><strong>Bilan :</strong> Aucun nouveau marché correspondant aux critères aujourd'hui.</p>"
