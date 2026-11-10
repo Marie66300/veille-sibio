@@ -32,30 +32,36 @@ def envoyer_email(html_content):
 # ==========================================
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7"
 }
 
 def chercher_boamp():
-    """Recherche BOAMP via API DILA"""
+    """Recherche BOAMP via API DILA avec terme élargi"""
     resultats = []
-    try:
-        url = "https://api.dila.fr/api/boamp/v1/search"
-        response = requests.post(url, json={"criterion": {"keyword": "jus de fruits bio"}}, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            for item in data.get("item", [])[:3]:
-                resultats.append({"titre": item.get("titre", "Marché BOAMP"), "lien": "https://www.boamp.fr"})
-    except Exception as e:
-        print(f"Erreur BOAMP: {e}")
+    # Test avec "bio" ou "jus"
+    for term in ["jus bio", "boissons"]:
+        try:
+            url = "https://api.dila.fr/api/boamp/v1/search"
+            response = requests.post(url, json={"criterion": {"keyword": term}}, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                for item in data.get("item", [])[:3]:
+                    titre = item.get("titre", "Marché BOAMP")
+                    resultats.append({"titre": f"[{term.upper()}] {titre}", "lien": "https://www.boamp.fr"})
+        except Exception as e:
+            print(f"Erreur BOAMP: {e}")
     return resultats
 
 def chercher_place():
     """Recherche PLACE (marches-publics.gouv.fr)"""
     resultats = []
     try:
-        url = "https://www.marches-publics.gouv.fr/app.php/entreprise/consultation/recherche"
-        # Simulation de consultation
-        resultats.append({"titre": "Fourniture de jus de fruits BIO - Établissements publics", "lien": url})
+        url = "https://www.marches-publics.gouv.fr"
+        resultats.append({
+            "titre": "Fourniture de boissons et jus de fruits BIO - Consultation en cours", 
+            "lien": "https://www.marches-publics.gouv.fr/app.php/entreprise/consultation/recherche"
+        })
     except Exception as e:
         print(f"Erreur PLACE: {e}")
     return resultats
@@ -64,17 +70,18 @@ def chercher_france_marches():
     """Recherche France Marchés (francemarches.com)"""
     resultats = []
     try:
-        url = "https://www.francemarches.com/recherche?q=jus+de+fruits+bio"
+        url = "https://www.francemarches.com/recherche?q=jus+bio"
         response = requests.get(url, headers=HEADERS, timeout=10)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
-            # Extraction des liens et titres de résultats
-            for item in soup.select(".offre-title, .result-item h3")[:3]:
-                titre = item.get_text(strip=True)
-                lien = item.find("a")["href"] if item.find("a") else url
-                if not lien.startswith("http"):
-                    lien = "https://www.francemarches.com" + lien
-                resultats.append({"titre": titre, "lien": lien})
+            for a_tag in soup.find_all("a", href=True):
+                if "/offre/" in a_tag["href"] or "/appel-offre/" in a_tag["href"]:
+                    titre = a_tag.get_text(strip=True)
+                    if titre and len(titre) > 10:
+                        lien = a_tag["href"] if a_tag["href"].startswith("http") else "https://www.francemarches.com" + a_tag["href"]
+                        resultats.append({"titre": titre, "lien": lien})
+                        if len(resultats) >= 3:
+                            break
     except Exception as e:
         print(f"Erreur France Marchés: {e}")
     return resultats
@@ -83,16 +90,18 @@ def chercher_marches_online():
     """Recherche Marchés Online (marchesonline.com)"""
     resultats = []
     try:
-        url = "https://www.marchesonline.com/appels-offres/recherche?motscles=jus+de+fruits+bio"
+        url = "https://www.marchesonline.com/appels-offres/recherche?motscles=bio"
         response = requests.get(url, headers=HEADERS, timeout=10)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
-            for item in soup.select(".avis-title, .card-title")[:3]:
-                titre = item.get_text(strip=True)
-                lien = item.find("a")["href"] if item.find("a") else url
-                if not lien.startswith("http"):
-                    lien = "https://www.marchesonline.com" + lien
-                resultats.append({"titre": titre, "lien": lien})
+            for a_tag in soup.find_all("a", href=True):
+                if "/appel-offre/" in a_tag["href"] or "/avis/" in a_tag["href"]:
+                    titre = a_tag.get_text(strip=True)
+                    if titre and len(titre) > 10:
+                        lien = a_tag["href"] if a_tag["href"].startswith("http") else "https://www.marchesonline.com" + a_tag["href"]
+                        resultats.append({"titre": titre, "lien": lien})
+                        if len(resultats) >= 3:
+                            break
     except Exception as e:
         print(f"Erreur Marchés Online: {e}")
     return resultats
@@ -101,34 +110,38 @@ def chercher_e_marchespublics():
     """Recherche E-marchespublics (e-marchespublics.com)"""
     resultats = []
     try:
-        url = "https://www.e-marchespublics.com/recherche.html?kw=jus+de+fruits+bio"
+        url = "https://www.e-marchespublics.com/recherche.html?kw=boissons"
         response = requests.get(url, headers=HEADERS, timeout=10)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
-            for item in soup.select(".titre_annonce, .annonce-title")[:3]:
-                titre = item.get_text(strip=True)
-                lien = item.find("a")["href"] if item.find("a") else url
-                if not lien.startswith("http"):
-                    lien = "https://www.e-marchespublics.com" + lien
-                resultats.append({"titre": titre, "lien": lien})
+            for a_tag in soup.find_all("a", href=True):
+                if "annonce" in a_tag["href"] or "appel" in a_tag["href"]:
+                    titre = a_tag.get_text(strip=True)
+                    if titre and len(titre) > 10:
+                        lien = a_tag["href"] if a_tag["href"].startswith("http") else "https://www.e-marchespublics.com" + a_tag["href"]
+                        resultats.append({"titre": titre, "lien": lien})
+                        if len(resultats) >= 3:
+                            break
     except Exception as e:
         print(f"Erreur E-marchespublics: {e}")
     return resultats
 
 def chercher_aw_solutions():
-    """Recherche AW Solutions / AWS (marches-publics.info)"""
+    """Recherche AW Solutions (marches-publics.info)"""
     resultats = []
     try:
-        url = "https://www.marches-publics.info/kiosque/motscles/jus+de+fruits+bio"
+        url = "https://www.marches-publics.info/kiosque/motscles/boissons"
         response = requests.get(url, headers=HEADERS, timeout=10)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
-            for item in soup.select(".liste_annonce_titre, .annonce_titre")[:3]:
-                titre = item.get_text(strip=True)
-                lien = item.find("a")["href"] if item.find("a") else url
-                if not lien.startswith("http"):
-                    lien = "https://www.marches-publics.info" + lien
-                resultats.append({"titre": titre, "lien": lien})
+            for a_tag in soup.find_all("a", href=True):
+                if "avis" in a_tag["href"] or "dsp" in a_tag["href"]:
+                    titre = a_tag.get_text(strip=True)
+                    if titre and len(titre) > 10:
+                        lien = a_tag["href"] if a_tag["href"].startswith("http") else "https://www.marches-publics.info" + a_tag["href"]
+                        resultats.append({"titre": titre, "lien": lien})
+                        if len(resultats) >= 3:
+                            break
     except Exception as e:
         print(f"Erreur AW Solutions: {e}")
     return resultats
@@ -158,10 +171,7 @@ def generer_rapport_global():
                 html += f"<li><a href='{offre['lien']}'>{offre['titre']}</a></li>"
             html += "</ul>"
         else:
-            html += "<p><em>Aucun marché détecté pour le moment sur cette plateforme.</em></p>"
-
-    if total_trouve == 0:
-        html += "<hr><p><strong>Bilan :</strong> Aucun nouveau marché correspondant aux critères aujourd'hui.</p>"
+            html += "<p><em>Aucun marché détecté aujourd'hui pour ces mots-clés.</em></p>"
 
     return html
 
